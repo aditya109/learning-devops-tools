@@ -1,0 +1,17 @@
+version: "3.9"  # optional since v1.27.0
+services:
+  master:
+    build: .
+    image: ubuntu-custom
+    container_name: server
+    
+  slave-1:
+    build: .
+    image: ubuntu-custom
+    container_name: slave-1
+    
+  slave-2:
+    build: .
+    image: ubuntu-custom
+    container_name: slave-2
+    
