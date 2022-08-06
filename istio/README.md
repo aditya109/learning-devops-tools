@@ -60,5 +60,5 @@ Istio provides ***Dynamic Traffic Routing***.
 
 #### Setup for application - header propagation
 
-
+![](https://raw.githubusercontent.com/aditya109/learning-devops-tools/main/istio/assets/header-propagation-jagear-tracing.svg)
 
