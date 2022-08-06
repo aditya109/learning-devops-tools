@@ -60,5 +60,13 @@ Istio provides ***Dynamic Traffic Routing***.
 
 #### Setup for application - header propagation
 
-![](https://raw.githubusercontent.com/aditya109/learning-devops-tools/main/istio/assets/header-propagation-jagear-tracing.svg)
+![](https://raw.githubusercontent.com/aditya109/learning-devops-tools/959f52f5240d14ccdcc1fa7fc883c0bc62b74991/istio/assets/header-propagation-jaeger-tracing.svg)
+
+On receiving a request, the proxy if it doesn't see the field `x-request-id` it create a unique guid and attach it to the header.
+
+If there are subsequent requests being made, the application does have to manually do it, meaning manually take out the header.
+
+[1]: https://istio.io/latest/docs/tasks/observability/distributed-tracing/overview/#trace-context-propagation	"Istio trace context propagation"
+
+
 
