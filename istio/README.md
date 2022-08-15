@@ -300,3 +300,77 @@ spec:
 curl --header "x-myval: 192" http://192.168.49.2:30080/api/vehicles/driver/Cit%20Truck
 ```
 
+## Gateways
+
+### Why do I need an Ingress Gateway ?
+
+*A new feature has been release with image tagged as `:6-experimental`, but the requirement is to deploy this as a 10% canary release.*
+
+### Edge Proxies and Gateways
+
+### Prefix based routing
+
+### Sub-domain Routing
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
