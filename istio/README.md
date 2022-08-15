@@ -204,7 +204,99 @@ spec:
 
 ![](https://istio.io/latest/img/service-mesh.svg)
 
-### VirtualService configuration in yaml
+## Load Balancing
 
-### 
+### Session Affinity (*Stickiness*)
+
+*Is it possible to use the weighted destination rules to make a single user `stick` to a canary ?*
+
+In short, not directly. *DestinationRule* does not natively support it, but has a work-around within itself.
+
+For example, the following rule uses a round robin load balancing policy for all traffic going to the ratings service.
+
+```yaml
+kind: DestinationRule       # Defining which pods should be part of each subset
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: grouping-rules-for-our-photograph-canary-release # This can be anything you like.
+  namespace: default
+spec:
+  host: fleetman-staff-service # Service
+  trafficPolicy:
+    loadBalancer:
+      simple: ROUND_ROBIN
+  subsets:
+    - labels:   # SELECTOR.
+        version: safe # find pods with label "safe"
+      name: safe-group
+    - labels:
+        version: risky
+      name: risky-group
+```
+
+The following example sets up sticky sessions for the ratings service hashing-based load balancer for the same ratings service using the the User cookie as the hash key. 
+
+```yaml
+kind: DestinationRule       # Defining which pods should be part of each subset
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: grouping-rules-for-our-photograph-canary-release # This can be anything you like.
+  namespace: default
+spec:
+  host: fleetman-staff-service # Service
+  trafficPolicy:
+    loadBalancer:
+      consistentHash:
+        useSourceIp: true
+  subsets:
+    - labels:   # SELECTOR.
+        version: safe # find pods with label "safe"
+      name: safe-group
+    - labels:
+        version: risky
+      name: risky-group
+```
+
+>  <span style="color:#CC5500">***Warning !*** This does not really work as load balancers are created after the weighted rules are created. </span> 
+> We need to mix it up service gateway to achieve this. https://github.com/istio/istio/issues/9764#issuecomment-631994703
+
+Workaround: *use it without weighted routes*
+
+```yaml
+kind: VirtualService
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: a-set-of-routing-rules-we-can-call-this-anything  # "just" a name for this virtualservice
+  namespace: default  
+spec:
+  hosts:
+    - fleetman-staff-service.default.svc.cluster.local  # The Service DNS (ie the regular K8S Service) name that we're applying routing rules to.
+  http:
+    - route:
+        - destination:
+            host: fleetman-staff-service.default.svc.cluster.local # The Target DNS name
+            subset: all-staff-service-pods  # The name defined in the DestinationRule
+          # weight: 100 not needed if there's only one.
+---
+kind: DestinationRule       # Defining which pods should be part of each subset
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: grouping-rules-for-our-photograph-canary-release # This can be anything you like.
+  namespace: default
+spec:
+  host: fleetman-staff-service # Service
+  trafficPolicy:
+    loadBalancer:
+      consistentHash:
+        httpHeaderName: "x-myval"
+  subsets:
+    - labels:   # SELECTOR.
+        app: staff-service # find pods with label "safe"
+      name: all-staff-service-pods
+```
+
+```bash
+# now if you do a curl 
+curl --header "x-myval: 192" http://192.168.49.2:30080/api/vehicles/driver/Cit%20Truck
+```
 
