@@ -304,7 +304,7 @@ curl --header "x-myval: 192" http://192.168.49.2:30080/api/vehicles/driver/Cit%2
 
 ### Why do I need an Ingress Gateway ?
 
-*A new feature has been release with image tagged as `:6-experimental`, but the requirement is to deploy this as a 10% canary release.*
+**Requirement:** A new feature has been release with image tagged as `:6-experimental`, but the requirement is to deploy this as a 10% canary release.*
 
 ```yaml
 ---
@@ -350,13 +350,258 @@ Solution: <span style="color:#26AF37"> Edge Proxy</span> => Istio Ingress Gatewa
 
 ### Edge Proxies and Gateways
 
+```yaml
+# ingress gateway
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: ingress-gateway-configuration
+spec:
+  selector:
+    istio: ingressgateway # use Istio default gateway implementation - ingress-gateway-pod label (pre-existing)
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"
+```
 
+Upon adding the above gateway configuration, if we go to http gateway endpoint:
+
+```bash
+> m service list
+|--------------|----------------------------|-------------------|---------------------------|
+|  NAMESPACE   |            NAME            |    TARGET PORT    |            URL            |
+|--------------|----------------------------|-------------------|---------------------------|
+| default      | fleetman-api-gateway       | No node port      |
+| default      | fleetman-position-tracker  | No node port      |
+| default      | fleetman-staff-service     | No node port      |
+| default      | fleetman-vehicle-telemetry | No node port      |
+| default      | fleetman-webapp            | http/80           | http://192.168.49.2:30080 |
+| default      | kubernetes                 | No node port      |
+| istio-system | grafana                    | service/3000      | http://192.168.49.2:31002 |
+| istio-system | istio-egressgateway        | No node port      |
+| istio-system | istio-ingressgateway       | status-port/15021 | http://192.168.49.2:32063 |
+|              |                            | http2/80          | http://192.168.49.2:31200 |  👈
+|              |                            | https/443         | http://192.168.49.2:31959 |
+|              |                            | tcp/31400         | http://192.168.49.2:31552 |
+|              |                            | tls/15443         | http://192.168.49.2:32042 |
+| istio-system | istiod                     | No node port      |
+| istio-system | jaeger-collector           | No node port      |
+| istio-system | kiali                      | http/20001        | http://192.168.49.2:31000 |
+|              |                            | http-metrics/9090 | http://192.168.49.2:31178 |
+| istio-system | prometheus                 | No node port      |
+| istio-system | tracing                    | http-query/80     | http://192.168.49.2:31001 |
+| istio-system | zipkin                     | No node port      |
+| kube-system  | kube-dns                   | No node port      |
+|--------------|----------------------------|-------------------|---------------------------|
+```
+
+i.e., http://192.168.49.2:31200 we get a 404, because it does not have any other service routing configuration.
+
+```yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: ingress-gateway-configuration
+spec:
+  selector:
+    istio: ingressgateway # use Istio default gateway implementation
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*" # domain name of the external website
+---
+kind: VirtualService
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: fleetman-webapp
+  namespace: default
+spec:
+  hosts:
+    - fleetman-webapp.default.svc.cluster.local
+    - "*" # copy the value from the gateway hosts
+  gateways:
+    - ingress-gateway-configuration
+  http:
+    - route:
+        - destination:
+            host: fleetman-webapp.default.svc.cluster.local
+            subset: original
+          weight: 90
+        - destination:
+            host: fleetman-webapp.default.svc.cluster.local
+            subset: experimental
+          weight: 10
+```
+
+Now if we do http://192.168.49.2:31200 we get 90-10 split.
+
+> <span style="color:#F1462B"> *The proxies run after a container makes a request !*</span>
 
 ### Prefix based routing
 
+**Requirement:** 
+
+1. `/canary` or `/experimental`  - traffic goes to version 1
+2. `/` - traffic goes to version 2 
+
+```yaml
+kind: VirtualService
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: fleetman-webapp
+  namespace: default
+spec:
+  hosts:
+    - "*" # copy the value in the gateway hosts
+  gateways:
+    - ingress-gateway-configuration
+  http:
+    - match:
+      - uri:
+          prefix: '/canary' # if
+      - uri:
+          prefix: '/experimental' # or
+      route:
+      - destination:
+            host: fleetman-webapp.default.svc.cluster.local
+            subset: experimental
+    - match:
+      - uri:
+          prefix: '/'
+      route:
+      - destination:
+            host: fleetman-webapp.default.svc.cluster.local
+            subset: original
+    - route:
+        - destination:
+            host: fleetman-webapp.default.svc.cluster.local
+            subset: original
+          weight: 90
+        - destination:
+            host: fleetman-webapp.default.svc.cluster.local
+            subset: experimental
+          weight: 10
+```
+
+> <span style="color:#F1462B">*`route` field exists in both places inside `match`* and as a separate entity as well.</span>
+
 ### Sub-domain Routing
 
+**Requirement:** 
 
+1. `fleetman.com:31200`  - traffic goes to `original` version
+2. `experimental.fleetman.com:31200` - traffic goes to `experimental` version
+
+```yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: ingress-gateway-configuration
+spec:
+  selector:
+    istio: ingressgateway # use Istio default gateway implementation
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*fleetman.com" # domain name of the external website
+---
+kind: VirtualService
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: fleetman-webapp
+  namespace: default
+spec:
+  hosts:
+    - "fleetman.com" # copy the value in the gateway hosts
+  gateways:
+    - ingress-gateway-configuration
+  http:
+    - route:
+        - destination:
+            host: fleetman-webapp.default.svc.cluster.local
+            subset: original
+---
+kind: VirtualService
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: fleetman-webapp-experimental
+  namespace: default
+spec:
+  hosts:
+    - "experimental.fleetman.com" # copy the value in the gateway hosts
+  gateways:
+    - ingress-gateway-configuration
+  http:
+    - route:
+        - destination:
+            host: fleetman-webapp.default.svc.cluster.local
+            subset: experimental
+```
+
+```bash
+❯ curl -s experimental.fleetman.com:31200 | grep title
+  <title>Fleet Management Istio Premium Enterprise Edition</title>
+❯ curl -s fleetman.com:31200 | grep title
+  <title>Fleet Management</title>
+
+```
+
+## Dark Releases
+
+*We use one domain, but differentiate canary release via headers.*
+
+If the request header contains `my-header=canary` it should redirect to experimental version, else original version.
+
+```yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: ingress-gateway-configuration
+spec:
+  selector:
+    istio: ingressgateway # use Istio default gateway implementation
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"   # Domain name of the external website
+---
+kind: VirtualService
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: fleetman-webapp
+  namespace: default
+spec:
+  hosts:      # which incoming host are we applying the proxy rules to???
+    - "*"
+  gateways:
+    - ingress-gateway-configuration
+  http:
+    - match:
+      - headers:  # IF
+          my-header:
+            exact: canary
+      route: # THEN
+      - destination:
+          host: fleetman-webapp
+          subset: experimental
+    - route: # CATCH ALL
+      - destination:
+          host: fleetman-webapp
+          subset: original
+```
 
 
 
