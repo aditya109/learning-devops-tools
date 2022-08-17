@@ -728,7 +728,9 @@ A cascading failure is a failure in a system of interconnected parts in which th
 
 ***Use istio, instead !***
 
-![](https://raw.githubusercontent.com/aditya109/learning-devops-tools/main/istio/assets/circuit-breaker.svg)
+![](https://raw.githubusercontent.com/aditya109/learning-devops-tools/main/istio/assets/circuit-breaker-fall.svg)
+
+*But what happens if there is just 1 pod ?* (Backpressure)
 
 
 
