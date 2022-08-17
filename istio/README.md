@@ -306,7 +306,51 @@ curl --header "x-myval: 192" http://192.168.49.2:30080/api/vehicles/driver/Cit%2
 
 *A new feature has been release with image tagged as `:6-experimental`, but the requirement is to deploy this as a 10% canary release.*
 
+```yaml
+---
+kind: VirtualService
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: fleetman-webapp
+  namespace: default
+spec:
+  hosts:
+    - fleetman-webapp.default.svc.cluster.local
+  http:
+    - route:
+        - destination:
+            host: fleetman-webapp.default.svc.cluster.local
+            subset: original
+          weight: 90
+        - destination:
+            host: fleetman-webapp.default.svc.cluster.local
+            subset: experimental
+          weight: 10
+---
+kind: DestinationRule
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: fleetman-webapp
+  namespace: default
+spec:
+  host: fleetman-webapp.default.svc.cluster.local
+  subsets:
+    - labels:
+        version: original
+      name: original
+    - labels:
+        version: experimental
+      name: experimental
+```
+
+The above however does not result in 90-10 traffic split.
+Reason: *The above services run frontend, which directly come from the user, not via the proxy, meaning the reason traffic splitting was possible through Istio was because we were able to re-route the traffic through proxy sidecar, which won't be possible if your pod traffic is coming via the service.*
+
+Solution: <span style="color:#26AF37"> Edge Proxy</span> => Istio Ingress Gateway
+
 ### Edge Proxies and Gateways
+
+
 
 ### Prefix based routing
 
