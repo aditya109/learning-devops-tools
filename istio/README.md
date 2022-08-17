@@ -350,6 +350,8 @@ Solution: <span style="color:#26AF37"> Edge Proxy</span> => Istio Ingress Gatewa
 
 ### Edge Proxies and Gateways
 
+![](https://github.com/aditya109/learning-devops-tools/raw/main/istio/assets/edge-proxy-gateway.svg)
+
 ```yaml
 # ingress gateway
 apiVersion: networking.istio.io/v1alpha3
@@ -591,7 +593,7 @@ spec:
   http:
     - match:
       - headers:  # IF
-          my-header:
+          x-my-header:
             exact: canary
       route: # THEN
       - destination:
@@ -603,17 +605,128 @@ spec:
           subset: original
 ```
 
+> <span style="color:#F1462B">If you are making an api request from a pod to another, you need to do *header propagation*. </span>
+>
+> **Meaning** if you are pushing any header `x-my-header=canary` from edge service, that same header will have to be propagated throughout the service.
 
+## Fault Injection
 
+https://en.wikipedia.org/wiki/Fallacies_of_distributed_computing
 
+> *The fallacies are*:
+>
+> 1. The network is reliable;
+> 2. Latency is zero;
+> 3. Bandwidth is infinite;
+> 4. The network is secure;
+> 5. Topology doesn't change;
+> 6. There is one administrator;
+> 7. Transport cost is zero;
+> 8. The network is homogeneous.
+>
+> *The effects of the fallacies:*
+>
+> 1. Software applications are written with little error-handling on networking errors. During a network outage, such applications may stall or infinitely wait for an answer packet, permanently consuming memory or other resources. When the failed network becomes available, those applications may also fail to retry any stalled operations or require a (manual) restart.
+> 2. Ignorance of network latency, and of the packet loss it can cause, induces application- and transport-layer developers to allow unbounded traffic, greatly increasing dropped packets and wasting bandwidth.
+> 3. Ignorance of bandwidth limits on the part of traffic senders can result in bottlenecks.
+> 4. Complacency regarding network security results in being blindsided by malicious users and programs that continually adapt to security measures.
+> 5. Changes in network topology can have effects on both bandwidth and latency issues, and therefore can have similar problems.
+> 6. Multiple administrators, as with subnets for rival companies, may institute conflicting policies of which senders of network traffic must be aware in order to complete their desired paths.
+> 7. The "hidden" costs of building and maintaining a network or subnet are non-negligible and must consequently be noted in budgets to avoid vast shortfalls.
+> 8. If a system assumes a homogeneous network, then it can lead to the same problems that result from the first three fallacies.
 
+**Requirement:** *Fail traffic from a microservice for 14% of the time*
 
+```yaml
+---
+kind: VirtualService
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: fleetman-vehicle-telemetry
+  namespace: default
+spec:
+  hosts:
+    - fleetman-vehicle-telemetry.default.svc.cluster.local
+  http:
+    - match:
+      - headers:  # IF
+          x-my-header:
+            exact: canary
+      fault:
+        abort:
+          httpStatus: 503
+          percentage:
+            value: 14                # can be changed to simulate a fault injection
+      route:
+        - destination:
+            host: fleetman-vehicle-telemetry.default.svc.cluster.local
+---
+kind: DestinationRule
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: fleetman-vehicle-telemetry
+  namespace: default
+spec:
+  host: fleetman-vehicle-telemetry.default.svc.cluster.local
+  subsets: []
 
+```
 
+**Requirement:** *delay traffic from a microservice for 53% of the time*
 
+```yaml
+---
+kind: VirtualService
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: fleetman-vehicle-telemetry
+  namespace: default
+spec:
+  hosts:
+    - fleetman-vehicle-telemetry.default.svc.cluster.local
+  http:
+    - match:
+      - headers:  # IF
+          x-my-header:
+            exact: canary
+      fault:
+        delay:
+          percentage:
+            value: 53.0                # can be changed to simulate a fault injection
+          fixedDelay: 10s
+      route:
+        - destination:
+            host: fleetman-vehicle-telemetry.default.svc.cluster.local
+---
+kind: DestinationRule
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: fleetman-vehicle-telemetry
+  namespace: default
+spec:
+  host: fleetman-vehicle-telemetry.default.svc.cluster.local
+  subsets: []
+```
 
+## Circuit Breaking
 
+### Cascading Failures
 
+A cascading failure is a failure in a system of interconnected parts in which the failure of one or few parts leads to the failure of other parts, growing progressively as a result of positive feedback. 
+
+<span style="color:#269B10">**Solution: Circuit Breaker**</span>
+
+1. A service client should invoke a remote service via a proxy that functions in a similar fashion to an electrical circuit breaker. 
+2. When the number of consecutive failures crosses a threshold, the circuit breaker trips, and for the duration of a timeout period all attempts to invoke the remote service will fail immediately. 
+3. After the timeout expires the circuit breaker allows a limited number of test requests to pass through. 
+4. If those requests succeed the circuit breaker resumes normal operation. Otherwise, if there is a failure the timeout period begins again.
+
+<span style="color:#E74414">Cons for the *classic* circuit breaking</span>:
+
+1. You need to build the circuit breaker into your microservice (every single one of them).
+2. You are relying on the programming language for the implementation of the circuit breaker.
+
+***Use istio, instead !***
 
 
 
