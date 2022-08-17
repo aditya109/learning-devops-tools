@@ -728,7 +728,7 @@ A cascading failure is a failure in a system of interconnected parts in which th
 
 ***Use istio, instead !***
 
-
+![](https://raw.githubusercontent.com/aditya109/learning-devops-tools/main/istio/assets/circuit-breaker.svg)
 
 
 
