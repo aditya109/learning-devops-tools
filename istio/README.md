@@ -732,11 +732,85 @@ A cascading failure is a failure in a system of interconnected parts in which th
 
 *But what happens if there is just 1 pod ?* (we use **backpressure**, meaning we fail immediately, rather than cascading it further.)
 
+![](https://github.com/aditya109/learning-devops-tools/raw/main/istio/assets/circuit-breaker-backpressure.svg)
 
 
 
+### Configuring Outlier Detection (circuit breaking)
+
+Use this to measure curl request:
+
+```bash
+❯ while true; do curl -s -w '=> Latency: %{time_total}s\n' http://192.168.49.2:32566/api/vehicles/driver/City%20Truck; echo ; echo ; done
+```
+
+```yaml
+# generic gateway configuration and virtualservice, we don't really need this.
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: ingress-gateway-configuration
+spec:
+  selector:
+    istio: ingressgateway # use Istio default gateway implementation
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"   # Domain name of the external website
+---
+# All traffic routed to the fleetman-webapp service
+# No DestinationRule needed as we aren't doing any subsets, load balancing or outlier detection.
+kind: VirtualService
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: fleetman-webapp
+  namespace: default
+spec:
+  hosts:      # which incoming host are we applying the proxy rules to???
+    - "*"
+  gateways:
+    - ingress-gateway-configuration
+  http:
+    - route:
+      - destination:
+          host: fleetman-webapp
+```
+
+```yaml
+# destinationrule, REQUIRED !
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: circuit-breaker-for-the-entire-default-namespace
+spec:
+  host: "fleetman-staff-service.default.svc.cluster.local"          # This is the name of the k8s service that we're configuring
+  trafficPolicy:
+    outlierDetection: # Circuit Breakers HAVE TO BE SWITCHED ON
+      maxEjectionPercent: 100
+      consecutive5xxErrors: 3
+      interval: 20s
+      baseEjectionTime: 30s
+
+```
+
+## Mutual TLS
+
+### Why is encryption needed inside a cluster ?
+
+**Requirement:** Is it required that the inter-pod traffic is unencrypted ?
 
 
+
+### How Istio can upgrade traffic to TLS 
+
+### Enabling mTLS - it's automatic
+
+### STRICT VS PERMISSIVE mTLS
+
+### STRICT mTLS works in both directions
 
 
 
