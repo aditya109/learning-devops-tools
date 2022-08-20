@@ -815,7 +815,11 @@ How to do it ?
 
 ### STRICT VS PERMISSIVE mTLS+
 
+**Permissive mTLS**
 
+![](https://github.com/aditya109/learning-devops-tools/raw/main/istio/assets/permissive-mTLS.svg)
+
+It is going to stay as in as an `http` call.
 
 ### STRICT mTLS works in both directions
 
