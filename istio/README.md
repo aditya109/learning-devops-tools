@@ -802,13 +802,20 @@ spec:
 
 **Requirement:** Is it required that the inter-pod traffic is unencrypted ?
 
-
-
 ### How Istio can upgrade traffic to TLS 
 
-### Enabling mTLS - it's automatic
+Basically the normal calls being made from the app pod would still be in `http` but this call goes to the proxy which in turn make an `https` call. The component which enables us to do is `istio-citadel` (part of `istiod` pod now). Now the proxies make calls via `https`. The certificates are going to be issued by the `istio-citadel`.
 
-### STRICT VS PERMISSIVE mTLS
+How to do it ?
+
+1. Enforce a policy that BLOCKS all non TLS traffic.
+2. Automatically upgrade all proxy-proxy communication to use mTLS.
+
+<strong>Enabling mTLS - it's automatic, it is already done.</strong>
+
+### STRICT VS PERMISSIVE mTLS+
+
+
 
 ### STRICT mTLS works in both directions
 
