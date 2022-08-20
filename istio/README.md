@@ -821,9 +821,27 @@ How to do it ?
 
 It is going to stay as in as an `http` call.
 
-### STRICT mTLS works in both directions
+![](https://github.com/aditya109/learning-devops-tools/raw/main/istio/assets/strict-mTLS.svg)
 
+It is put in the namespace.
 
+```yaml
+# This will enforce that ONLY traffic that is TLS is allowed between proxies
+apiVersion: "security.istio.io/v1beta1"
+kind: "PeerAuthentication"
+metadata:
+  name: "default"
+  namespace: "istio-system"
+spec:
+  mtls:
+    mode: STRICT # or PERMISSIVE (which is default)
+```
+
+<span style="color:orange">**STRICT mTLS works in both directions.**</span>
+
+## Customizing and installing Istio with Istioctl
+
+https://istio.io/latest/docs/setup/getting-started/#download
 
 
 
